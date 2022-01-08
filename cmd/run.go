@@ -17,35 +17,158 @@ package cmd
 
 import (
 	"fmt"
+	"os/exec"
+	"strings"
 
+	_ "github.com/lima-vm/lima/pkg/start"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	_ "github.com/spf13/cobra"
 )
 
-// runCmd represents the run command
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+const (
+	defaultInstanceName = "default"
+)
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("run called")
+var (
+	flagUnix    string
+	flagTcpPort string
+)
+
+// startCmd represents the run command
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Args:  cobra.ExactArgs(1),
+	Short: "Provides a connection to buildkitd daemon over TCP or socket file",
+	Long: `buildkit-machine is a project to create a socket file or open a TCP connection to
+buildkitd over ssh to be able to access buildkitd daemon living in a VM. By doing so,
+you can now start using buildctl tool, which is a tool developed for interacting buildkitd daemon,
+to build and push container images in your macOS environment easily and quickly.
+
+There are two modes supported in buildkit-machine: unix and tcp.
+
+To access buildkitd over tcp connection:
+
+$ buildkit-machine start <instance_name> --tcp <port>
+$ buildctl --addr tcp://127.0.0.1:9999 build ...
+
+To access buildkitd over unix socket:
+
+$ buildkit-machine start <instance_name> --unix $(pwd)/buildkitd.sock
+$ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
+
+`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateFlags(); err != nil {
+			return err
+		}
+
+		var instName string
+		if len(args) == 0 {
+			instName = defaultInstanceName
+		} else {
+			instName = args[0]
+		}
+
+		limactlExecPath, err := exec.LookPath("limactl")
+		if err != nil {
+			return err
+		}
+		//
+		//limactlCmd := exec.Command(limactlExecPath, "start", instName)
+		//sePipe, err := limactlCmd.StderrPipe()
+		//if err != nil {
+		//	return err
+		//}
+		//
+		//err = limactlCmd.Start()
+		//if err != nil {
+		//	return errors.Wrap(err, "could not run limactl")
+		//}
+		//
+		//// print the output of the subprocess
+		//scanner := bufio.NewScanner(sePipe)
+		//for scanner.Scan() {
+		//	logrus.Info("LIMACTL ", scanner.Text())
+		//}
+		//
+		//err = limactlCmd.Wait()
+		//if err != nil {
+		//	return errors.Wrap(err, "could not run limactl")
+		//}
+
+		o, err := exec.Command(limactlExecPath, "show-ssh", "--format=args", instName).CombinedOutput()
+		if err != nil {
+			return err
+		}
+
+		sshConfigOutput := string(o)
+		parts := strings.Split(sshConfigOutput, "-o")[1:]
+		var sshOptions []string
+		for _, p := range parts {
+			if strings.Contains(p, "ControlPath") {
+				continue
+			}
+			sshOptions = append(sshOptions, "-o", strings.TrimSpace(p))
+		}
+
+		if flagUnix != "" {
+			sshOptions = append(sshOptions, "-nNT")
+			rootlessBuildkitdSockPath := "/run/user/502/buildkit/buildkitd.sock"
+			sockPath := fmt.Sprintf("%s:%s", flagUnix, rootlessBuildkitdSockPath)
+			sshOptions = append(sshOptions, "-L", sockPath, "lima@127.0.0.1")
+			return exec.Command("ssh", sshOptions...).Run()
+		}
+
+		if flagTcpPort != "" {
+			// ssh -o IdentityFile="/Users/batuhan.apaydin/.lima/_config/user" -o Port=49747 -o User=lima -o Hostname=127.0.0.1 lima@127.0.0.1
+			//-L 9999:localhost:9999 "socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/502/buildkit/buildkitd.sock"
+			socatCmd := exec.Command(limactlExecPath, "shell", instName, "sudo", "apt", "install", "-y", "socat")
+			if err := socatCmd.Start(); err != nil {
+				return errors.Wrap(err, "could not install socat")
+			}
+
+			if err := socatCmd.Wait(); err != nil {
+				return errors.Wrap(err, "could not install socat")
+			}
+
+			fmt.Printf("sshOptions: %+v", sshOptions)
+			strings.Join(sshOptions, "")
+
+			cmd := fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/502/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort))
+			o, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+			fmt.Println(string(o))
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	},
 }
 
+func validateFlags() error {
+	if flagTcpPort == "" && flagUnix == "" {
+		return errors.New("at least one scheme should be specified")
+	}
+	if flagTcpPort != "" && flagUnix != "" {
+		return errors.New("only one scheme can be activated at the same time")
+	}
+	return nil
+}
+
 func init() {
-	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(startCmd)
+	startCmd.Flags().StringVarP(&flagUnix, "unix", "", "", "a unix socket path for buildkitd.sock")
+	startCmd.Flags().StringVarP(&flagTcpPort, "tcp", "", "", "a tcp port to bind")
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// runCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// startCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// runCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

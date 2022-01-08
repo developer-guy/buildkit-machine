@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -29,13 +30,25 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "buildkit-machine",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "Provides a connection to buildkitd daemon over TCP or socket file",
+	Long: `buildkit-machine is a project to create a socket file or open a TCP connection to
+buildkitd over ssh to be able to access buildkitd daemon living in a VM. By doing so,
+you can now start using buildctl tool, which is a tool developed for interacting buildkitd daemon,
+to build and push container images in your macOS environment easily and quickly.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+There are two modes supported in buildkit-machine: unix and tcp.
+
+To access buildkitd over tcp connection:
+
+$ buildkit-machine start <instance_name> --tcp 9999
+$ buildctl --addr tcp://127.0.0.1:9999 build ...
+
+To access buildkitd over unix socket:
+
+$ buildkit-machine start <instance_name> --unix $(pwd)/buildkitd.sock
+$ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
+
+`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
