@@ -39,24 +39,17 @@ var (
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Args:  cobra.ExactArgs(1),
-	Short: "Provides a connection to buildkitd daemon over TCP or socket file",
-	Long: `buildkit-machine is a project to create a socket file or open a TCP connection to
-buildkitd over ssh to be able to access buildkitd daemon living in a VM. By doing so,
-you can now start using buildctl tool, which is a tool developed for interacting buildkitd daemon,
-to build and push container images in your macOS environment easily and quickly.
-
-There are two modes supported in buildkit-machine: unix and tcp.
-
+	Short: "Starts the buildkitd in a VM and makes it accessible by given mode",
+	Long: `There are two ways of starting buildkit-machine: unix and tcp.
 To access buildkitd over tcp connection:
 
-$ buildkit-machine start <instance_name> --tcp <port>
+$ buildkit-machine start <instance_name> --tcp 9999
 $ buildctl --addr tcp://127.0.0.1:9999 build ...
 
 To access buildkitd over unix socket:
 
 $ buildkit-machine start <instance_name> --unix $(pwd)/buildkitd.sock
 $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
-
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := validateFlags(); err != nil {

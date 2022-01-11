@@ -32,22 +32,12 @@ var rootCmd = &cobra.Command{
 	Use:   "buildkit-machine",
 	Short: "Provides a connection to buildkitd daemon over TCP or socket file",
 	Long: `buildkit-machine is a project to create a socket file or open a TCP connection to
-buildkitd over ssh to be able to access buildkitd daemon living in a VM. By doing so,
-you can now start using buildctl tool, which is a tool developed for interacting buildkitd daemon,
+buildkitd over SSH to be able to access Buildkitd Daemon lives in a VM. By doing so,
+we can now start using buildctl tool, which is a tool developed for interacting buildkitd,
 to build and push container images in your macOS environment easily and quickly.
 
-There are two modes supported in buildkit-machine: unix and tcp.
-
-To access buildkitd over tcp connection:
-
-$ buildkit-machine start <instance_name> --tcp 9999
-$ buildctl --addr tcp://127.0.0.1:9999 build ...
-
-To access buildkitd over unix socket:
-
-$ buildkit-machine start <instance_name> --unix $(pwd)/buildkitd.sock
-$ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
-
+buildkit-machine uses lima-vm under to hood to virtualize the buildkitd in a VM. When lima-vm first boots up, 
+it starts bunch of services such as containerd, buildkitd, etc in a rootless way. Once buildkitd starts up in a rootless way, it can accessible through a socket file locates under /run/user/502/buildkit/buildkitd.sock which is a way that we use to connect to Buildkitd Daemon.
 `,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
