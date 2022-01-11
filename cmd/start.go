@@ -16,12 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os/exec"
 	"strings"
 
 	_ "github.com/lima-vm/lima/pkg/start"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	_ "github.com/spf13/cobra"
 )
@@ -67,28 +69,28 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 		if err != nil {
 			return err
 		}
-		//
-		//limactlCmd := exec.Command(limactlExecPath, "start", instName)
-		//sePipe, err := limactlCmd.StderrPipe()
-		//if err != nil {
-		//	return err
-		//}
-		//
-		//err = limactlCmd.Start()
-		//if err != nil {
-		//	return errors.Wrap(err, "could not run limactl")
-		//}
-		//
-		//// print the output of the subprocess
-		//scanner := bufio.NewScanner(sePipe)
-		//for scanner.Scan() {
-		//	logrus.Info("LIMACTL ", scanner.Text())
-		//}
-		//
-		//err = limactlCmd.Wait()
-		//if err != nil {
-		//	return errors.Wrap(err, "could not run limactl")
-		//}
+
+		limactlCmd := exec.Command(limactlExecPath, "start", instName)
+		sePipe, err := limactlCmd.StderrPipe()
+		if err != nil {
+			return err
+		}
+
+		err = limactlCmd.Start()
+		if err != nil {
+			return errors.Wrap(err, "could not run limactl")
+		}
+
+		// print the output of the subprocess
+		scanner := bufio.NewScanner(sePipe)
+		for scanner.Scan() {
+			logrus.Info("LIMACTL ", scanner.Text())
+		}
+
+		err = limactlCmd.Wait()
+		if err != nil {
+			return errors.Wrap(err, "could not run limactl")
+		}
 
 		o, err := exec.Command(limactlExecPath, "show-ssh", "--format=args", instName).CombinedOutput()
 		if err != nil {
@@ -114,24 +116,13 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 		}
 
 		if flagTcpPort != "" {
-			// ssh -o IdentityFile="/Users/batuhan.apaydin/.lima/_config/user" -o Port=49747 -o User=lima -o Hostname=127.0.0.1 lima@127.0.0.1
-			//-L 9999:localhost:9999 "socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/502/buildkit/buildkitd.sock"
 			socatCmd := exec.Command(limactlExecPath, "shell", instName, "sudo", "apt", "install", "-y", "socat")
-			if err := socatCmd.Start(); err != nil {
+			if err := socatCmd.Run(); err != nil {
 				return errors.Wrap(err, "could not install socat")
 			}
-
-			if err := socatCmd.Wait(); err != nil {
-				return errors.Wrap(err, "could not install socat")
-			}
-
-			fmt.Printf("sshOptions: %+v", sshOptions)
-			strings.Join(sshOptions, "")
 
 			cmd := fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/502/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort))
-			o, err := exec.Command("sh", "-c", cmd).CombinedOutput()
-			fmt.Println(string(o))
-			if err != nil {
+			if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
 				return err
 			}
 		}
