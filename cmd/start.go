@@ -18,7 +18,10 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"log"
+	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 
 	_ "github.com/lima-vm/lima/pkg/start"
@@ -121,10 +124,21 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 				return errors.Wrap(err, "could not install socat")
 			}
 
-			cmd := fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/502/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort))
-			if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
-				return err
-			}
+			signalCh := make(chan os.Signal, 1)
+			signal.Notify(signalCh, os.Interrupt)
+
+			go func() {
+				cmd := fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/502/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort))
+				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+					log.Fatalf("could not run ssh: %v", err)
+				}
+			}()
+
+			log.Printf("%s machine started succesfully.\n", instName)
+
+			<-signalCh
+
+			log.Printf("%s machine stopped succesfully.\n", instName)
 		}
 
 		return nil
