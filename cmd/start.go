@@ -119,6 +119,7 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 		if flagUnix != "" {
 			sshOptions = append(sshOptions, "-nNT")
 			rootlessBuildkitdSockPath := fmt.Sprintf("/run/user/%s/buildkit/buildkitd.sock", strings.TrimSpace(string(uid)))
+			println(rootlessBuildkitdSockPath)
 			sockPath := fmt.Sprintf("%s:%s", flagUnix, rootlessBuildkitdSockPath)
 			sshOptions = append(sshOptions, "-L", sockPath, "lima@127.0.0.1")
 			commandStr = fmt.Sprintf("ssh %s", strings.Join(sshOptions, " "))
