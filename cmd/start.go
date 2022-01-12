@@ -134,7 +134,14 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 
 			go func() {
 				cmd := fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/%s/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort), string(uid))
-				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
+				shCmd := exec.Command("sh", "-c", cmd)
+				err = shCmd.Start()
+				if err != nil {
+					log.Fatalf("could not run ssh: %v", err)
+				}
+
+				err := shCmd.Wait()
+				if err != nil {
 					log.Fatalf("could not run ssh: %v", err)
 				}
 			}()
