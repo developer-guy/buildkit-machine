@@ -148,12 +148,11 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 				done <- true
 			}
 
-			go func() {
-				if err := c.Wait(); err != nil && !receivedInterrupt {
-					println("111111")
-					errChn <- fmt.Errorf("could not run ssh: %v", err)
-				}
-			}()
+			if err := c.Wait(); err != nil && !receivedInterrupt {
+				println("111111")
+				errChn <- fmt.Errorf("could not run ssh: %v", err)
+			}
+		
 		}()
 
 		for {
