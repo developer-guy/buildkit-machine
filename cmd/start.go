@@ -119,6 +119,11 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 		}
 
 		if flagTcpPort != "" {
+			uid, err := exec.Command(limactlExecPath, "shell", instName, "id", "-u").CombinedOutput()
+			if err != nil {
+				return errors.Wrap(err, "could not find user id")
+			}
+
 			socatCmd := exec.Command(limactlExecPath, "shell", instName, "sudo", "apt", "install", "-y", "socat")
 			if err := socatCmd.Run(); err != nil {
 				return errors.Wrap(err, "could not install socat")
@@ -128,7 +133,7 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			signal.Notify(signalCh, os.Interrupt)
 
 			go func() {
-				cmd := fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/502/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort))
+				cmd := fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/%s/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort), string(uid))
 				if err := exec.Command("sh", "-c", cmd).Run(); err != nil {
 					log.Fatalf("could not run ssh: %v", err)
 				}
@@ -137,6 +142,12 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			log.Printf("%s machine started succesfully.\n", instName)
 
 			<-signalCh
+
+			log.Printf("%s machine stopping now..\n", instName)
+
+			if err := exec.Command("limactl", "delete", instName).Run(); err != nil {
+				return errors.Wrap(err, "could not delete instance")
+			}
 
 			log.Printf("%s machine stopped succesfully.\n", instName)
 		}
