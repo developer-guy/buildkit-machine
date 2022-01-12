@@ -150,18 +150,16 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			}
 
 			go func() {
-			 if err := c.Wait(); err != nil && !receivedInterrupt {
-				println("111111")
-				errChn <- fmt.Errorf("could not run ssh: %v", err)
-			 }
+				if err := c.Wait(); err != nil && !receivedInterrupt {
+					errChn <- fmt.Errorf("could not run ssh: %v", err)
+				}
 			}()
-		
+
 		}()
 
 		for {
 			select {
 			case err := <-errChn:
-				println("22222")
 				close(errChn)
 				log.Fatalf("%s", err)
 			case <-signalCh:
@@ -174,6 +172,11 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 				}
 
 				log.Printf("%s machine stopped succesfully.\n", instName)
+
+				if flagUnix != "" {
+					_ = os.Remove(flagUnix)
+				}
+
 				os.Exit(0)
 			case <-done:
 				log.Printf("%s machine started succesfully.\n", instName)
