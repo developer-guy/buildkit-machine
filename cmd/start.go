@@ -121,7 +121,7 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			rootlessBuildkitdSockPath := fmt.Sprintf("/run/user/%s/buildkit/buildkitd.sock", strings.TrimSpace(string(uid)))
 			sockPath := fmt.Sprintf("%s:%s", flagUnix, rootlessBuildkitdSockPath)
 			sshOptions = append(sshOptions, "-L", sockPath, "lima@127.0.0.1")
-			commandStr = fmt.Sprintf("ssasjihbfajhbfjhsbfjhbsh %s", strings.Join(sshOptions, " "))
+			commandStr = fmt.Sprintf("ssh %s", strings.Join(sshOptions, " "))
 		}
 
 		if flagTcpPort != "" {
@@ -137,23 +137,34 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 
 		errChn := make(chan error)
 		done := make(chan bool)
+		receivedInterrupt := false
 
 		go func() {
 			c := exec.Command("sh", "-c", commandStr)
 
-			if err := c.Start(); err == nil {
+			if err := c.Start(); err != nil {
+				errChn <- fmt.Errorf("could not run ssh: %v", err)
+			} else {
 				done <- true
 			}
 
-			go c.Wait()
+			go func() {
+				if err := c.Wait(); err != nil && !receivedInterrupt {
+					println("111111")
+					errChn <- fmt.Errorf("could not run ssh: %v", err)
+				}
+			}()
 		}()
 
 		for {
 			select {
 			case err := <-errChn:
+				println("22222")
 				close(errChn)
 				log.Fatalf("%s", err)
 			case <-signalCh:
+				receivedInterrupt = true
+
 				log.Printf("%s machine stopping now..\n", instName)
 
 				if err := exec.Command("limactl", "delete", instName, "--force").Run(); err != nil {
