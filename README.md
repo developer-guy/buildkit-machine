@@ -4,7 +4,7 @@ buildkit-machine allows you to make buildkitd daemon accessible in your macOS en
 
 ## Overview
 
-![gif](./res/anim.gif)
+![gif](./.res/anim.gif)
 
 ## Installation
 
