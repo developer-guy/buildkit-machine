@@ -2,6 +2,10 @@
 
 buildkit-machine allows you to make buildkitd daemon accessible in your macOS environment. To do so, it uses [lima](https://github.com/lima-vm/lima), which is a Linux subsystem for macOS, under the hood. lima spins up a VM that runs buildkitd daemon in a rootless way which means that sock file of the buildkitd daemon is now be able to accessible from `/run/user/502/buildkit/buildkitd`.
 
+## Overview
+
+![gif](./res/anim.gif)
+
 ## Installation
 
 ```shell
