@@ -17,12 +17,15 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	_ "github.com/lima-vm/lima/pkg/start"
 	"github.com/pkg/errors"
@@ -133,55 +136,47 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			commandStr = fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/%s/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort), strings.TrimSpace(string(uid)))
 		}
 
-		signalCh := make(chan os.Signal, 1)
-		signal.Notify(signalCh, os.Interrupt)
+		ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-		errChn := make(chan error)
-		done := make(chan bool)
-		receivedInterrupt := false
+		c := exec.CommandContext(ctx, "sh", "-c", commandStr)
 
+		err = c.Start()
+		if err != nil {
+			ctxCancel()
+			return fmt.Errorf("starting sh: %v", err)
+		}
+
+		log.Printf("%s machine started succesfully.\n", instName)
+
+		waitCh := make(chan error, 1)
 		go func() {
-			c := exec.Command("sh", "-c", commandStr)
-
-			if err := c.Start(); err != nil {
-				errChn <- fmt.Errorf("could not run ssh: %v", err)
-			} else {
-				done <- true
+			err := c.Wait()
+			waitCh <- err
+			if err != nil {
+				ctxCancel()
 			}
-
-			go func() {
-				if err := c.Wait(); err != nil && !receivedInterrupt {
-					errChn <- fmt.Errorf("could not run ssh: %v", err)
-				}
-			}()
-
 		}()
 
-		for {
-			select {
-			case err := <-errChn:
-				close(errChn)
-				log.Fatalf("%s", err)
-			case <-signalCh:
-				receivedInterrupt = true
 
-				log.Printf("%s machine stopping now..\n", instName)
+		signalCh := make(chan os.Signal, 1)
+		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 
-				if err := exec.Command("limactl", "delete", instName, "--force").Run(); err != nil {
-					return errors.Wrap(err, "could not delete instance")
-				}
+		<-signalCh
 
-				log.Printf("%s machine stopped succesfully.\n", instName)
+		log.Printf("%s machine stopping now...\n", instName)
 
-				if flagUnix != "" {
-					_ = os.Remove(flagUnix)
-				}
-
-				os.Exit(0)
-			case <-done:
-				log.Printf("%s machine started succesfully.\n", instName)
-			}
+		if err := exec.Command("limactl", "stop", instName, "--force").Run(); err != nil {
+			fmt.Errorf("could not stop instance: %w", err)
+			os.Exit(1)
 		}
+
+		log.Printf("%s machine stopped succesfully.\n", instName)
+
+		if flagUnix != "" {
+			_ = os.Remove(flagUnix)
+		}
+
+		return nil
 	},
 }
 
