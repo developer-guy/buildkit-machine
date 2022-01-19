@@ -6,6 +6,10 @@ buildkit-machine allows you to make buildkitd daemon accessible in your macOS en
 
 ![gif](./.res/anim.gif)
 
+## Architecture
+
+![svg](./.res/graphviz.svg)
+
 ## Installation
 
 ```shell

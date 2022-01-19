@@ -1,0 +1,45 @@
+digraph G {
+    lm [ label="$ limactl start $INSTANCE" shape="note" ]
+    lms [ label="$ limactl show-ssh --format=args $INSTANCE" shape="note" ]
+    lmi [ label="$ limactl shell $INSTANCE id -u" shape="note" ]
+    lmsocat [ label="$ limactl shell $INSTANCE sudo apt install -y socat" shape="note" ]
+    shell [ label="$ sh -c $CONNECTION_STR" shape="note" ]
+    pause [ label="$ limactl pause $INSTANCE" shape="note" ]
+    tcp [ label="generate tcp connection" shape="note" ]
+    socket [ label="socket forwarding" shape="note" ]
+  
+    subgraph cluster_0 {
+        style=filled;
+        color=lightgrey;
+        node [style=filled,color=white];
+        
+        lm -> lms;
+        lm:e -> lm:w [ label = <<b><i>Wait until Lima up and running</i></b>> ];
+        
+        lms -> lmi;
+        
+        lmi -> lmsocat [ label="if tcp" ] ;
+        lmi -> tcp [ label="if unix" ];
+        
+        lmsocat -> socket;
+        
+        tcp -> shell;
+        socket -> shell;
+        
+        shell:e -> shell:w [ label = <<b><i>Wait Interrupt</i></b>> ];
+        
+        shell -> pause [ label = "on interrupt received" ];
+    }
+
+    subgraph cluster_1 {
+        node [style=filled];
+        label = "lima";
+        color=blue
+    }
+  
+    start -> lm;
+    pause -> end;
+    
+    start [shape=Mdiamond];
+    end [shape=Msquare];
+}
