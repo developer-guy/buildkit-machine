@@ -157,7 +157,6 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			}
 		}()
 
-
 		signalCh := make(chan os.Signal, 1)
 		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 
