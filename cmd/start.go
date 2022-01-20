@@ -26,11 +26,9 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/lima-vm/lima/pkg/start"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	_ "github.com/spf13/cobra"
 )
 
 const (
@@ -121,7 +119,6 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 		if flagUnix != "" {
 			sshOptions = append(sshOptions, "-nNT")
 			rootlessBuildkitdSockPath := fmt.Sprintf("/run/user/%s/buildkit/buildkitd.sock", strings.TrimSpace(string(uid)))
-			println(rootlessBuildkitdSockPath)
 			sockPath := fmt.Sprintf("%s:%s", flagUnix, rootlessBuildkitdSockPath)
 			sshOptions = append(sshOptions, "-L", sockPath, "lima@127.0.0.1")
 			commandStr = fmt.Sprintf("ssh %s", strings.Join(sshOptions, " "))
@@ -145,7 +142,7 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			return fmt.Errorf("starting sh: %v", err)
 		}
 
-		log.Printf("%s machine started succesfully.\n", instName)
+		log.Printf("%s machine started successfully.\n", instName)
 
 		waitCh := make(chan error, 1)
 		go func() {
@@ -164,11 +161,10 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 		log.Printf("%s machine stopping now...\n", instName)
 
 		if err := exec.Command("limactl", "stop", instName, "--force").Run(); err != nil {
-			fmt.Errorf("could not stop instance: %w", err)
-			os.Exit(1)
+			return fmt.Errorf("could not stop instance: %w", err)
 		}
 
-		log.Printf("%s machine stopped succesfully.\n", instName)
+		log.Printf("%s machine stopped successfully.\n", instName)
 
 		if flagUnix != "" {
 			_ = os.Remove(flagUnix)
