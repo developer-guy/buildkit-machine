@@ -16,7 +16,6 @@ package cmd
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -24,7 +23,6 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -122,6 +120,7 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			sockPath := fmt.Sprintf("%s:%s", flagUnix, rootlessBuildkitdSockPath)
 			sshOptions = append(sshOptions, "-L", sockPath, "lima@127.0.0.1")
 			commandStr = fmt.Sprintf("ssh %s", strings.Join(sshOptions, " "))
+			fmt.Fprintln(os.Stdout, commandStr)
 		}
 
 		if flagTcpPort != "" {
@@ -132,26 +131,18 @@ $ buildctl --addr unix://$(pwd)/buildkitd.sock build ...
 			commandStr = fmt.Sprintf("ssh %s lima@127.0.0.1 -L %s \"socat TCP-LISTEN:9999,fork,bind=localhost UNIX-CONNECT:/run/user/%s/buildkit/buildkitd.sock\"", strings.Join(sshOptions, " "), fmt.Sprintf("%s:localhost:9999", flagTcpPort), strings.TrimSpace(string(uid)))
 		}
 
-		ctx, ctxCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		c := exec.Command("sh", "-c", commandStr)
 
-		c := exec.CommandContext(ctx, "sh", "-c", commandStr)
-
-		err = c.Start()
-		if err != nil {
-			ctxCancel()
+		if err := c.Start(); err != nil {
 			return fmt.Errorf("starting sh: %v", err)
 		}
 
 		log.Printf("%s machine started successfully.\n", instName)
 
-		waitCh := make(chan error, 1)
-		go func() {
-			err := c.Wait()
-			waitCh <- err
-			if err != nil {
-				ctxCancel()
-			}
-		}()
+		if err := c.Wait(); err != nil {
+			return fmt.Errorf("starting sh: %v", err)
+
+		}
 
 		signalCh := make(chan os.Signal, 1)
 		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
